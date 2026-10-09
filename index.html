@@ -82,9 +82,46 @@ form.find input { flex: 1; }
   #map { height: 58vh; grid-row: 1; }
   .panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); }
 }
+/* Password gate: covers the app until the correct password is entered. */
+.locked .app { visibility: hidden; }
+.gate { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 16px; background: var(--bg); }
+.gate[hidden] { display: none; }
+.gate form { width: min(320px, 100%); display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.gate input { width: 100%; background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; font-family: var(--mono); }
 </style>
 </head>
-<body>
+<body class="locked">
+<div class="gate" id="gate">
+  <form id="gate-form" autocomplete="off">
+    <h1>Trajectory Map Placer</h1>
+    <label class="hint" for="gate-pw">Enter password to continue</label>
+    <input type="password" id="gate-pw" autofocus required>
+    <p class="msg err" id="gate-msg" role="alert"></p>
+    <button class="btn primary" type="submit">Unlock</button>
+  </form>
+</div>
+<script>
+(() => {
+  // SHA-256 of the password; the plain password is not stored in the page.
+  const HASH = '1c057ae90315515144f68bb39c75e48a14259aee97940255e8b9cf15cee57b8e';
+  const KEY = 'pp-unlocked';
+  const unlock = () => { document.body.classList.remove('locked'); document.getElementById('gate').hidden = true; };
+  try { if (sessionStorage.getItem(KEY) === HASH) unlock(); } catch {}
+  const sha256 = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))]
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  document.getElementById('gate-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw = document.getElementById('gate-pw');
+    if (await sha256(pw.value) === HASH) {
+      try { sessionStorage.setItem(KEY, HASH); } catch {}
+      unlock();
+    } else {
+      document.getElementById('gate-msg').textContent = 'Wrong password';
+      pw.select();
+    }
+  });
+})();
+</script>
 <div class="app" id="app">
   <aside class="panel">
     <div>
