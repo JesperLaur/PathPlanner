@@ -1,0 +1,449 @@
+{
+        "job": {
+            "id": "test",
+            "label": "test",
+            "tasks": [
+                {
+                    "id": "test",
+                    "label": "test",
+                    "trajectory_task_description": {
+                        "trajectory": {
+                            "geo_path_description": {
+                                "geometry": [
+                                    {
+                                        "segment_group": {
+                                            "origin": {
+                                                "longitude": 9.86763849548,
+                                                "latitude": 56.95601291929
+                                            },
+                                            "heading": -2.6,
+                                            "segments": [
+                                                {
+                                                    "id": "segment_0",
+                                                    "label": "line segment",
+                                                    "line_segment": {
+                                                        "start": {
+                                                            "x": 0.0,
+                                                            "y": 0.0
+                                                        },
+                                                        "end": {
+                                                            "x": 0.0,
+                                                            "y": 15.0
+                                                        }
+                                                    },
+                                                    "direction": "LINEAR_DIRECTION_FORWARD",
+                                                    "tool_parameters": [
+                                                        {
+                                                            "arc_length": 0,
+                                                            "tool": 6
+                                                        }
+                                                    ],
+                                                    "backward_transit": false
+                                                },
+                                                {
+                                                    "id": "segment_1",
+                                                    "label": "line segment reverse",
+                                                    "line_segment": {
+                                                        "start": {
+                                                            "x": 1.0,
+                                                            "y": 15.0
+                                                        },
+                                                        "end": {
+                                                            "x": 1.0,
+                                                            "y": 0.0
+                                                        }
+                                                    },
+                                                    "direction": "LINEAR_DIRECTION_BACKWARD",
+                                                    "tool_parameters": [
+                                                        {
+                                                            "arc_length": 0,
+                                                            "tool": 6
+                                                        }
+                                                    ],
+                                                    "backward_transit": true
+                                                },
+                                                {
+                                                    "id": "segment_2",
+                                                    "label": "circular arc",
+                                                    "circular_arc": {
+                                                        "center": {
+                                                            "x": 3.0,
+                                                            "y": 1.0
+                                                        },
+                                                        "start": {
+                                                            "x": 4.0,
+                                                            "y": 1.0
+                                                        },
+                                                        "sweep_angle": 6.28
+                                                    },
+                                                    "direction": "LINEAR_DIRECTION_FORWARD",
+                                                    "tool_parameters": [
+                                                        {
+                                                            "arc_length": 0,
+                                                            "tool": 6
+                                                        }
+                                                    ],
+                                                    "backward_transit": false
+                                                },
+                                                {
+                                                    "id": "segment_3",
+                                                    "label": "circular arc reverse",
+                                                    "circular_arc": {
+                                                        "center": {
+                                                            "x": 3.0,
+                                                            "y": 4.0
+                                                        },
+                                                        "start": {
+                                                            "x": 2.0,
+                                                            "y": 4.0
+                                                        },
+                                                        "sweep_angle": -6.28
+                                                    },
+                                                    "direction": "LINEAR_DIRECTION_BACKWARD",
+                                                    "tool_parameters": [
+                                                        {
+                                                            "arc_length": 0,
+                                                            "tool": 6
+                                                        }
+                                                    ],
+                                                    "backward_transit": true
+                                                },
+                                                
+    {
+        "id": "6",
+        "label": "arc_line_arc_forward_0",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "line_segment": {
+            "start": {
+                "x": 5.0,
+                "y": 6.0
+            },
+            "end": {
+                "x": 3.0,
+                "y": 6.0
+            }
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "7",
+        "label": "arc_line_arc_forward_1",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "circular_arc": {
+            "start": {
+                "x": 3.0,
+                "y": 6.0
+            },
+            "center": {
+                "x": 3.0,
+                "y": 7.0
+            },
+            "sweep_angle" : -3.14159265358979
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0,
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "8",
+        "label": "arc_line_arc_forward_2",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "line_segment": {
+            "start": {
+                "x": 3.0,
+                "y": 8.0
+            },
+            "end": {
+                "x": 5.0,
+                "y": 8.0
+            }
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0,
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "9",
+        "label": "arc_line_arc_forward_3",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "circular_arc": {
+            "start": {
+                "x": 5.0,
+                "y": 8.0
+            },
+            "center": {
+                "x": 5.0,
+                "y": 9.0
+            },
+            "sweep_angle" : 3.14159265359
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0,
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "10",
+        "label": "arc_line_arc_forward_4",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "line_segment": {
+            "start": {
+                "x": 5.0,
+                "y": 10.0
+            },
+            "end": {
+                "x": 3.0,
+                "y": 10.0
+            }
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0
+    },
+    {
+        "id": "11",
+        "label": "arc_line_arc_backward_0",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "line_segment": {
+            "start": {
+                "x": 5.0,
+                "y": 11.0
+            },
+            "end": {
+                "x": 3.0,
+                "y": 11.0
+            }
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "post_padding_distance": 0.0,
+        "backward_transit": true
+    },
+    {
+        "id": "12",
+        "label": "arc_line_arc_backward_1",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "circular_arc": {
+            "start": {
+                "x": 3.0,
+                "y": 11.0
+            },
+            "center": {
+                "x": 3.0,
+                "y": 12.0
+            },
+            "sweep_angle" : -3.14159265359
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0,
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "13",
+        "label": "arc_line_arc_backward_2",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "line_segment": {
+            "start": {
+                "x": 3.0,
+                "y": 13.0
+            },
+            "end": {
+                "x": 5.0,
+                "y": 13.0
+            }
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0,
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "14",
+        "label": "arc_line_arc_backward_3",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "circular_arc": {
+            "start": {
+                "x": 5.0,
+                "y": 13.0
+            },
+            "center": {
+                "x": 5.0,
+                "y": 14.0
+            },
+            "sweep_angle" : 3.14159265359
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0,
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "15",
+        "label": "arc_line_arc_backward_4",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "line_segment": {
+            "start": {
+                "x": 5.0,
+                "y": 15.0
+            },
+            "end": {
+                "x": 3.0,
+                "y": 15.0
+            }
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0
+    },
+    {
+        "id": "16",
+        "label": "arc_arc_forward_0",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "circular_arc": {
+            "start": {
+                "x": 8.0,
+                "y": 15.0
+            },
+            "center": {
+                "x": 8.0,
+                "y": 14.0
+            },
+            "sweep_angle" : 3.14159265359
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "post_padding_distance": 0.0
+    },
+    {
+        "id": "17",
+        "label": "arc_arc_forward_1",
+        "direction": "LINEAR_DIRECTION_FORWARD",
+        "circular_arc": {
+            "start": {
+                "x": 8.0,
+                "y": 13.0
+            },
+            "center": {
+                "x": 8.0,
+                "y": 12.0
+            },
+            "sweep_angle" : -3.14159265359
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0
+    },
+    {
+        "id": "18",
+        "label": "arc_arc_backward_0",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "circular_arc": {
+            "start": {
+                "x": 8.0,
+                "y": 10.0
+            },
+            "center": {
+                "x": 8.0,
+                "y": 9.0
+            },
+            "sweep_angle" : -3.14159265358979
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "post_padding_distance": 0.0,
+        "backward_transit": true
+    },
+    {
+        "id": "19",
+        "label": "arc_arc_backward_1",
+        "direction": "LINEAR_DIRECTION_BACKWARD",
+        "circular_arc": {
+            "start": {
+                "x": 8.0,
+                "y": 8.0
+            },
+            "center": {
+                "x": 8.0,
+                "y": 7.0
+            },
+            "sweep_angle" : 3.14159265358979
+        },
+        "tool_parameters": [
+            {
+                "arc_length": 0.0,
+                "tool": 6
+            }
+        ],
+        "pre_padding_distance": 0.0
+    }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            },
+                            "utm_zone": 32,
+                            "is_northern_hemisphere": true
+                        }
+                    }
+                }
+            ]
+        }
+    }
+

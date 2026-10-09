@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trajectory Job Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-height workbench. Map canvas on the left, segment inspector on the right; stacks on phones. */
+:root {
+  --bg: #eef1ee;
+  --surface: #ffffff;
+  --glass: rgba(255,255,255,0.92);
+  --field: #f6f8f5;
+  --grid: #e1e7e2;
+  --grid-strong: #b9c4bc;
+  --ink: #1b2420;
+  --muted: #5b6862;
+  --line: #d3dbd5;
+  --fwd: #1c63c9;
+  --bwd: #c9551a;
+  --transit: #8b958f;
+  --sel: #f2b705;
+  --warn: #9a6a00;
+  --warn-bg: #fbf1d6;
+  --ok-bg: #e4efe8;
+  --ok: #2f6a48;
+  --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101412; --surface: #181e1b; --glass: rgba(24,30,27,0.92); --field: #131815;
+    --grid: #1f2723; --grid-strong: #36433c; --ink: #e2e9e4; --muted: #95a39b; --line: #2a332e;
+    --fwd: #5ea2ff; --bwd: #ff8f4f; --transit: #6e7a73; --sel: #f2c230;
+    --warn: #f0c35a; --warn-bg: #3a2f12; --ok-bg: #18301f; --ok: #8fd1a6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101412; --surface: #181e1b; --glass: rgba(24,30,27,0.92); --field: #131815;
+  --grid: #1f2723; --grid-strong: #36433c; --ink: #e2e9e4; --muted: #95a39b; --line: #2a332e;
+  --fwd: #5ea2ff; --bwd: #ff8f4f; --transit: #6e7a73; --sel: #f2c230;
+  --warn: #f0c35a; --warn-bg: #3a2f12; --ok-bg: #18301f; --ok: #8fd1a6;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--fwd); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding-inline: 16px; padding-block: 12px 16px; }
+
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; }
+.brand h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.01em; line-height: 1.1; text-wrap: balance; }
+.meta { margin: 2px 0 0; color: var(--muted); font-family: var(--mono); font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.meta b { color: var(--ink); font-weight: 500; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 6px 12px; cursor: pointer; font-weight: 500; }
+.btn:hover { border-color: var(--grid-strong); }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn.icon { padding: 4px 9px; min-width: 32px; font-family: var(--mono); }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; min-height: 0; }
+
+.stage { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--field); min-height: 420px; }
+.stage.drop { outline: 2px dashed var(--fwd); outline-offset: -6px; }
+#cv { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#cv.dragging { cursor: grabbing; }
+#cv.hovering { cursor: pointer; }
+
+.bar { position: absolute; left: 10px; right: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; pointer-events: none; }
+.bar > * { pointer-events: auto; }
+.bar.top { top: 10px; justify-content: space-between; }
+.bar.bottom { bottom: 10px; }
+.pane { background: var(--glass); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.sw { width: 18px; height: 0; border-top: 3px solid; border-radius: 2px; }
+.sw.fwd { border-color: var(--fwd); }
+.sw.bwd { border-color: var(--bwd); }
+.sw.transit { border-top: 2px dashed var(--transit); }
+.toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+
+.player { flex: 1 1 100%; gap: 10px; flex-wrap: nowrap; }
+.player input[type=range] { flex: 1; min-width: 60px; accent-color: var(--fwd); }
+.player .now { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.player select { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 3px 4px; font-size: 12.5px; }
+.readout { position: absolute; right: 12px; bottom: 62px; font-family: var(--mono); font-size: 11px; color: var(--muted); pointer-events: none; font-variant-numeric: tabular-nums; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); max-width: 260px; }
+.tip b { font-family: var(--mono); font-weight: 500; }
+.tip div { color: var(--muted); }
+
+.panel { min-height: 0; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.summary { padding: 14px 14px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.stat .v { font-family: var(--mono); font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 12px; color: var(--muted); font-weight: 400; }
+.note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.warnings { margin: 0; padding: 8px 10px 8px 26px; background: var(--warn-bg); color: var(--warn); border-radius: 7px; font-size: 12.5px; display: grid; gap: 3px; }
+.warnings b { font-family: var(--mono); font-weight: 500; }
+
+.list-head { padding: 10px 14px 6px; font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.02em; }
+#list { list-style: none; margin: 0; padding: 0 6px 10px; }
+.seg-row { width: 100%; text-align: left; background: none; border: 0; border-radius: 7px; padding: 7px 8px; cursor: pointer; display: grid; grid-template-columns: 10px auto minmax(0, 1fr) auto; column-gap: 9px; row-gap: 2px; align-items: center; }
+.seg-row:hover { background: var(--bg); }
+li.sel .seg-row { background: var(--bg); box-shadow: inset 3px 0 0 var(--sel); }
+li.current .seg-id::after { content: " ●"; color: var(--sel); }
+.chip { width: 10px; height: 10px; border-radius: 3px; }
+.chip.fwd { background: var(--fwd); }
+.chip.bwd { background: var(--bwd); }
+.chip.bad { background: var(--transit); }
+.seg-id { font-family: var(--mono); font-weight: 500; font-size: 13px; }
+.seg-label { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg-len { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.seg-sub { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.pill { font-size: 11px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.pill.smooth { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+.pill.corner, .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+
+.detail { margin: 2px 8px 10px 27px; display: grid; gap: 8px; }
+.detail dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; font-size: 12.5px; }
+.detail dt { color: var(--muted); }
+.detail dd { margin: 0; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.detail ul { margin: 0; padding-left: 18px; color: var(--warn); font-size: 12.5px; }
+.detail details summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.detail pre { margin: 6px 0 0; padding: 8px; background: var(--bg); border-radius: 6px; font-family: var(--mono); font-size: 11.5px; overflow-x: auto; max-height: 260px; }
+
+.modal { position: fixed; inset: 0; background: rgba(10,14,12,0.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.modal-card { width: min(760px, 100%); max-height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.modal-head h2 { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 700; }
+.modal p.hint { margin: 0; color: var(--muted); font-size: 13px; }
+#json-input { width: 100%; min-height: 300px; height: 52vh; resize: vertical; font-family: var(--mono); font-size: 12px; line-height: 1.5; background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.error { margin: 0; color: var(--warn); background: var(--warn-bg); padding: 8px 10px; border-radius: 7px; font-size: 13px; }
+.modal-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .app { height: auto; }
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .stage { height: 62vh; min-height: 380px; }
+  .panel { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1>Trajectory Job Viewer</h1>
+      <p class="meta" id="meta"></p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="open-file" type="button">Open file…</button>
+      <button class="btn" id="edit-json" type="button">Paste JSON</button>
+      <input type="file" id="file" accept=".json,application/json,text/plain" hidden>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="stage" id="stage" aria-label="Path map">
+      <canvas id="cv"></canvas>
+      <div class="bar top">
+        <div class="pane legend">
+          <span><i class="sw fwd"></i>Forward</span>
+          <span><i class="sw bwd"></i>Reverse</span>
+          <span><i class="sw transit"></i>Transit (not marked)</span>
+        </div>
+        <div class="pane">
+          <label class="toggle"><input type="checkbox" id="show-ids" checked> IDs</label>
+          <button class="btn icon" id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button class="btn icon" id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          <button class="btn" id="fit" type="button">Fit</button>
+        </div>
+      </div>
+      <div class="readout" id="readout"></div>
+      <div class="bar bottom">
+        <div class="pane player">
+          <button class="btn" id="play" type="button">Play</button>
+          <button class="btn" id="reset" type="button" title="Stop and show the whole path">Show all</button>
+          <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Playback position">
+          <span class="now" id="now"></span>
+          <select id="speed" aria-label="Playback speed">
+            <option value="0.5">0.5 m/s</option>
+            <option value="1">1 m/s</option>
+            <option value="2" selected>2 m/s</option>
+            <option value="5">5 m/s</option>
+            <option value="10">10 m/s</option>
+          </select>
+        </div>
+      </div>
+      <div class="tip" id="tip" hidden></div>
+    </section>
+
+    <aside class="panel">
+      <div class="summary">
+        <div class="stats" id="stats"></div>
+        <ul class="warnings" id="warnings" hidden></ul>
+        <p class="note">Drawn in local metres from the segment group origin. Heading and the UTM projection are not applied, so up on the map is +y, not necessarily north. Scroll to zoom, drag to pan, click a segment to inspect it.</p>
+      </div>
+      <div class="list-head">Segments in driving order</div>
+      <ol id="list"></ol>
+    </aside>
+  </div>
+</div>
+
+<div class="modal" id="editor" hidden role="dialog" aria-modal="true" aria-labelledby="editor-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="editor-title">Job JSON</h2>
+      <button class="btn" id="ed-close" type="button">Close</button>
+    </div>
+    <p class="hint">Paste a job file below, or drop a .json file onto the map.</p>
+    <textarea id="json-input" spellcheck="false" aria-label="Job JSON"></textarea>
+    <p class="error" id="ed-error" hidden></p>
+    <div class="modal-foot">
+      <button class="btn" id="ed-sample" type="button">Load example (test job.json)</button>
+      <button class="btn primary" id="ed-apply" type="button">Draw path</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAMPLE_NAME = 'test job.json';
+const SAMPLE = {"job":{"id":"test","label":"test","tasks":[{"id":"test","label":"test","trajectory_task_description":{"trajectory":{"geo_path_description":{"geometry":[{"segment_group":{"origin":{"longitude":9.86763849548,"latitude":56.95601291929},"heading":-2.6,"segments":[
+{"id":"segment_0","label":"line segment","line_segment":{"start":{"x":0.0,"y":0.0},"end":{"x":0.0,"y":15.0}},"direction":"LINEAR_DIRECTION_FORWARD","tool_parameters":[{"arc_length":0,"tool":6}],"backward_transit":false},
+{"id":"segment_1","label":"line segment reverse","line_segment":{"start":{"x":1.0,"y":15.0},"end":{"x":1.0,"y":0.0}},"direction":"LINEAR_DIRECTION_BACKWARD","tool_parameters":[{"arc_length":0,"tool":6}],"backward_transit":true},
+{"id":"segment_2","label":"circular arc","circular_arc":{"center":{"x":3.0,"y":1.0},"start":{"x":4.0,"y":1.0},"sweep_angle":6.28},"direction":"LINEAR_DIRECTION_FORWARD","tool_parameters":[{"arc_length":0,"tool":6}],"backward_transit":false},
+{"id":"segment_3","label":"circular arc reverse","circular_arc":{"center":{"x":3.0,"y":4.0},"start":{"x":2.0,"y":4.0},"sweep_angle":-6.28},"direction":"LINEAR_DIRECTION_BACKWARD","tool_parameters":[{"arc_length":0,"tool":6}],"backward_transit":true},
+{"id":"6","label":"arc_line_arc_forward_0","direction":"LINEAR_DIRECTION_FORWARD","line_segment":{"start":{"x":5.0,"y":6.0},"end":{"x":3.0,"y":6.0}},"tool_parameters":[{"arc_length":0.0,"tool":6}],"post_padding_distance":0.0},
+{"id":"7","label":"arc_line_arc_forward_1","direction":"LINEAR_DIRECTION_FORWARD","circular_arc":{"start":{"x":3.0,"y":6.0},"center":{"x":3.0,"y":7.0},"sweep_angle":-3.14159265358979},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0,"post_padding_distance":0.0},
+{"id":"8","label":"arc_line_arc_forward_2","direction":"LINEAR_DIRECTION_FORWARD","line_segment":{"start":{"x":3.0,"y":8.0},"end":{"x":5.0,"y":8.0}},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0,"post_padding_distance":0.0},
+{"id":"9","label":"arc_line_arc_forward_3","direction":"LINEAR_DIRECTION_FORWARD","circular_arc":{"start":{"x":5.0,"y":8.0},"center":{"x":5.0,"y":9.0},"sweep_angle":3.14159265359},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0,"post_padding_distance":0.0},
+{"id":"10","label":"arc_line_arc_forward_4","direction":"LINEAR_DIRECTION_FORWARD","line_segment":{"start":{"x":5.0,"y":10.0},"end":{"x":3.0,"y":10.0}},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0},
+{"id":"11","label":"arc_line_arc_backward_0","direction":"LINEAR_DIRECTION_BACKWARD","line_segment":{"start":{"x":5.0,"y":11.0},"end":{"x":3.0,"y":11.0}},"tool_parameters":[{"arc_length":0.0,"tool":6}],"post_padding_distance":0.0,"backward_transit":true},
+{"id":"12","label":"arc_line_arc_backward_1","direction":"LINEAR_DIRECTION_BACKWARD","circular_arc":{"start":{"x":3.0,"y":11.0},"center":{"x":3.0,"y":12.0},"sweep_angle":-3.14159265359},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0,"post_padding_distance":0.0},
+{"id":"13","label":"arc_line_arc_backward_2","direction":"LINEAR_DIRECTION_BACKWARD","line_segment":{"start":{"x":3.0,"y":13.0},"end":{"x":5.0,"y":13.0}},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0,"post_padding_distance":0.0},
+{"id":"14","label":"arc_line_arc_backward_3","direction":"LINEAR_DIRECTION_BACKWARD","circular_arc":{"start":{"x":5.0,"y":13.0},"center":{"x":5.0,"y":14.0},"sweep_angle":3.14159265359},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0,"post_padding_distance":0.0},
+{"id":"15","label":"arc_line_arc_backward_4","direction":"LINEAR_DIRECTION_BACKWARD","line_segment":{"start":{"x":5.0,"y":15.0},"end":{"x":3.0,"y":15.0}},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0},
+{"id":"16","label":"arc_arc_forward_0","direction":"LINEAR_DIRECTION_FORWARD","circular_arc":{"start":{"x":8.0,"y":15.0},"center":{"x":8.0,"y":14.0},"sweep_angle":3.14159265359},"tool_parameters":[{"arc_length":0.0,"tool":6}],"post_padding_distance":0.0},
+{"id":"17","label":"arc_arc_forward_1","direction":"LINEAR_DIRECTION_FORWARD","circular_arc":{"start":{"x":8.0,"y":13.0},"center":{"x":8.0,"y":12.0},"sweep_angle":-3.14159265359},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0},
+{"id":"18","label":"arc_arc_backward_0","direction":"LINEAR_DIRECTION_BACKWARD","circular_arc":{"start":{"x":8.0,"y":10.0},"center":{"x":8.0,"y":9.0},"sweep_angle":-3.14159265358979},"tool_parameters":[{"arc_length":0.0,"tool":6}],"post_padding_distance":0.0,"backward_transit":true},
+{"id":"19","label":"arc_arc_backward_1","direction":"LINEAR_DIRECTION_BACKWARD","circular_arc":{"start":{"x":8.0,"y":8.0},"center":{"x":8.0,"y":7.0},"sweep_angle":3.14159265358979},"tool_parameters":[{"arc_length":0.0,"tool":6}],"pre_padding_distance":0.0}
+]}}]},"utm_zone":32,"is_northern_hemisphere":true}}}]}};
+
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const STORE_KEY = 'trajectory-viewer:last';
+const META_KEYS = new Set(['id','label','direction','tool_parameters','backward_transit','pre_padding_distance','post_padding_distance']);
+
+/* ---------- formatting ---------- */
+function f(v, d = 3) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  let s = v.toFixed(d);
+  if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return s === '-0' ? '0' : s.replace('-', '−');
+}
+const fp = p => `(${f(p.x)}, ${f(p.y)})`;
+const fm = v => `${(Math.abs(v) < 0.005 ? 0 : v).toFixed(2)} m`;
+const deg = r => r * 180 / Math.PI;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function normAng(a) { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; }
+function num(v) { const n = typeof v === 'string' && v.trim() === '' ? NaN : Number(v); return Number.isFinite(n) ? n : null; }
+function pt(o) { if (!o || typeof o !== 'object') return null; const x = num(o.x), y = num(o.y); return x === null || y === null ? null : { x, y }; }
+
+/* ---------- parsing ---------- */
+function walk(node, fn) {
+  if (Array.isArray(node)) { node.forEach(n => walk(n, fn)); return; }
+  if (node && typeof node === 'object') { fn(node); for (const k in node) walk(node[k], fn); }
+}
+
+function buildSegment(raw, off) {
+  const s = {
+    raw, id: raw.id ?? '(no id)', label: raw.label ?? '',
+    dir: /BACKWARD/i.test(String(raw.direction || '')) ? 'bwd' : 'fwd',
+    backwardTransit: raw.backward_transit === true,
+    tools: Array.isArray(raw.tool_parameters) ? raw.tool_parameters : [],
+    pre: raw.pre_padding_distance, post: raw.post_padding_distance,
+    notes: [], valid: false
+  };
+  const add = p => ({ x: p.x + off.x, y: p.y + off.y });
+  if (raw.line_segment) {
+    const a = pt(raw.line_segment.start), b = pt(raw.line_segment.end);
+    if (!a || !b) { s.kind = 'invalid'; s.notes.push('Line is missing a start or end point.'); return s; }
+    s.kind = 'line'; s.start = add(a); s.end = add(b);
+    s.length = Math.hypot(b.x - a.x, b.y - a.y);
+    const th = Math.atan2(b.y - a.y, b.x - a.x);
+    s.t0 = s.t1 = th;
+    s.at = d => { const k = s.length ? d / s.length : 0; return { x: s.start.x + (s.end.x - s.start.x) * k, y: s.start.y + (s.end.y - s.start.y) * k, th }; };
+    s.pts = [s.start, s.end]; s.samples = 1;
+    if (s.length < 1e-9) s.notes.push('Line has zero length.');
+  } else if (raw.circular_arc) {
+    const c = pt(raw.circular_arc.center), a = pt(raw.circular_arc.start), sw = num(raw.circular_arc.sweep_angle);
+    if (!c || !a || sw === null) { s.kind = 'invalid'; s.notes.push('Arc needs center, start and sweep_angle.'); return s; }
+    s.kind = 'arc';
+    const C = add(c), A = add(a), r = Math.hypot(A.x - C.x, A.y - C.y), a0 = Math.atan2(A.y - C.y, A.x - C.x), sg = sw >= 0 ? 1 : -1;
+    Object.assign(s, { center: C, radius: r, a0, sweep: sw, start: A });
+    s.end = { x: C.x + r * Math.cos(a0 + sw), y: C.y + r * Math.sin(a0 + sw) };
+    s.length = r * Math.abs(sw);
+    s.t0 = a0 + sg * Math.PI / 2; s.t1 = a0 + sw + sg * Math.PI / 2;
+    s.at = d => { const k = s.length ? d / s.length : 0, ang = a0 + sw * k; return { x: C.x + r * Math.cos(ang), y: C.y + r * Math.sin(ang), th: ang + sg * Math.PI / 2 }; };
+    s.samples = Math.max(12, Math.ceil(Math.abs(sw) / TAU * 144));
+    s.pts = Array.from({ length: s.samples + 1 }, (_, j) => s.at(s.length * j / s.samples));
+    if (r < 1e-9) s.notes.push('Arc has zero radius (start equals center).');
+    if (Math.abs(sw) > TAU + 1e-6) s.notes.push('Sweep is more than one full turn.');
+    const short = TAU - Math.abs(sw);
+    if (short > 1e-6 && short < 0.05) s.notes.push(`Full circle stops ${f(short * r * 1000, 1)} mm short of closing (sweep ${f(Math.abs(sw), 6)} vs 2π = 6.283185).`);
+  } else {
+    s.kind = 'unknown';
+    const keys = Object.keys(raw).filter(k => !META_KEYS.has(k));
+    s.notes.push(keys.length ? `Geometry type not supported by this viewer: ${keys.join(', ')}.` : 'Segment has no geometry.');
+    return s;
+  }
+  s.valid = true;
+  return s;
+}
+
+function parseJob(root) {
+  const job = root && root.job ? root.job : root;
+  const tasks = job && Array.isArray(job.tasks) ? job.tasks : [job];
+  const groups = [];
+  tasks.forEach(task => walk(task, n => { if (n.segment_group && typeof n.segment_group === 'object') groups.push({ task, g: n.segment_group }); }));
+  if (!groups.length) throw new Error('No segment_group found. The viewer looks for job → tasks → … → geometry → segment_group → segments.');
+  let utm = null;
+  walk(root, n => { if (!utm && 'utm_zone' in n) utm = { zone: n.utm_zone, north: n.is_northern_hemisphere }; });
+
+  const o0 = groups[0].g.origin || {};
+  const lat0 = num(o0.latitude), lon0 = num(o0.longitude);
+  const segs = [];
+  const warnings = [];
+  groups.forEach(({ task, g }, gi) => {
+    let off = { x: 0, y: 0 };
+    const o = g.origin || {};
+    if (gi > 0 && lat0 !== null && num(o.latitude) !== null) {
+      off = { x: (num(o.longitude) - lon0) * Math.cos(lat0 * Math.PI / 180) * 111320, y: (num(o.latitude) - lat0) * 110574 };
+    }
+    (Array.isArray(g.segments) ? g.segments : []).forEach(raw => {
+      const s = buildSegment(raw && typeof raw === 'object' ? raw : {}, off);
+      s.task = task; s.group = gi; s.gi = segs.length;
+      segs.push(s);
+    });
+  });
+  if (!segs.length) throw new Error('The segment group has no segments.');
+
+  // joins with the previous drawable segment
+  let prev = null;
+  for (const s of segs) {
+    if (!s.valid) continue;
+    if (prev) {
+      const gap = Math.hypot(s.start.x - prev.end.x, s.start.y - prev.end.y);
+      const turn = normAng(s.t0 - prev.t1);
+      s.join = { gap, turn, prev, kind: gap <= 5e-4 ? (Math.abs(deg(turn)) <= 0.5 ? 'smooth' : 'corner') : 'transit' };
+    } else s.join = null;
+    prev = s;
+  }
+
+  // duplicate ids
+  const seen = new Map();
+  segs.forEach(s => seen.set(String(s.id), (seen.get(String(s.id)) || 0) + 1));
+  for (const [id, n] of seen) if (n > 1) warnings.push({ id, text: `ID used by ${n} segments.` });
+  segs.forEach(s => s.notes.forEach(text => warnings.push({ id: s.id, text })));
+
+  // driving timeline
+  const steps = [];
+  let cur = null;
+  for (const s of segs) {
+    if (!s.valid) continue;
+    if (cur) {
+      const a = cur, b = s.start, len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len > 1e-6) {
+        const th = Math.atan2(b.y - a.y, b.x - a.x);
+        steps.push({ kind: 'transit', seg: s, len, rev: s.backwardTransit, samples: 1, at: d => ({ x: a.x + (b.x - a.x) * d / len, y: a.y + (b.y - a.y) * d / len, th }) });
+      }
+    }
+    s.step = { kind: 'seg', seg: s, len: s.length, rev: s.dir === 'bwd', samples: s.samples, at: s.at };
+    steps.push(s.step);
+    cur = s.end;
+  }
+  const total = steps.reduce((a, st) => a + st.len, 0);
+  const marked = segs.reduce((a, s) => a + (s.valid ? s.length : 0), 0);
+
+  const g0 = groups[0].g;
+  return { root, job, task: groups[0].task, origin: g0.origin, heading: g0.heading, utm, groups: groups.length, segs, steps, total, marked, transit: total - marked, warnings };
+}
+
+/* ---------- state ---------- */
+let model = null, sel = null, hover = null, showIds = true, fileName = SAMPLE_NAME;
+const anim = { active: false, playing: false, s: 0, speed: 2, last: 0, curSeg: null };
+const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
+let W = 0, H = 0, DPR = 1, fitted = false;
+const view = { cx: 0, cy: 0, k: 40 };
+const C = {};
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['field', 'grid', 'grid-strong', 'ink', 'muted', 'fwd', 'bwd', 'transit', 'sel', 'surface']) C[k] = cs.getPropertyValue('--' + k).trim();
+}
+
+const toS = p => [W / 2 + (p.x - view.cx) * view.k, H / 2 - (p.y - view.cy) * view.k];
+const toW = (sx, sy) => ({ x: view.cx + (sx - W / 2) / view.k, y: view.cy - (sy - H / 2) / view.k });
+const segColor = s => s.dir === 'bwd' ? C.bwd : C.fwd;
+
+/* ---------- drawing ---------- */
+function strokeStep(st, upto, color, width, dash, alpha) {
+  if (!st.len || upto <= 0) return;
+  const n = Math.max(1, Math.ceil(st.samples * upto / st.len));
+  ctx.beginPath();
+  for (let j = 0; j <= n; j++) { const [x, y] = toS(st.at(upto * j / n)); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = width;
+  ctx.setLineDash(dash); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+}
+
+function chevrons(st, color, alpha) {
+  const Ls = st.len * view.k;
+  if (Ls < 22) return;
+  const count = Math.max(1, Math.floor(Ls / 90));
+  ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let j = 0; j < count; j++) {
+    const p = st.at(st.len * (j + 0.5) / count), [x, y] = toS(p);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-p.th);
+    ctx.beginPath(); ctx.moveTo(-3.5, -5); ctx.lineTo(2.5, 0); ctx.lineTo(-3.5, 5); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawGrid() {
+  const choices = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+  const step = choices.find(s => s * view.k >= 46) || 5000;
+  const tl = toW(0, 0), br = toW(W, H);
+  ctx.lineWidth = 1;
+  ctx.font = '10.5px "IBM Plex Mono", ui-monospace, monospace';
+  ctx.fillStyle = C.muted;
+  const dec = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  for (let x = Math.ceil(tl.x / step) * step; x <= br.x; x += step) {
+    const sx = Math.round(toS({ x, y: 0 })[0]) + 0.5, axis = Math.abs(x) < step / 2;
+    ctx.strokeStyle = axis ? C['grid-strong'] : C.grid;
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
+    ctx.fillText(f(x, dec), sx + 3, 58);
+  }
+  for (let y = Math.ceil(br.y / step) * step; y <= tl.y; y += step) {
+    const sy = Math.round(toS({ x: 0, y })[1]) + 0.5, axis = Math.abs(y) < step / 2;
+    ctx.strokeStyle = axis ? C['grid-strong'] : C.grid;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+    ctx.fillText(f(y, dec), 4, sy - 3);
+  }
+  gridStep = step;
+}
+let gridStep = 1;
+
+function posAt(s) {
+  let acc = 0;
+  for (const st of model.steps) {
+    if (s <= acc + st.len || st === model.steps[model.steps.length - 1]) return { st, p: st.at(Math.max(0, Math.min(st.len, s - acc))) };
+    acc += st.len;
+  }
+  return null;
+}
+
+function draw() {
+  if (!W) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = C.field; ctx.fillRect(0, 0, W, H);
+  drawGrid();
+  if (!model) return;
+  const on = anim.active;
+
+  for (const s of [sel, hover]) if (s && s.valid) strokeStep(s.step, s.length, C.sel, s === sel ? 11 : 9, [], s === sel ? 0.55 : 0.35);
+
+  for (const st of model.steps) if (st.kind === 'transit') { strokeStep(st, st.len, C.transit, 1.5, [5, 5], on ? 0.35 : 0.9); chevrons(st, C.transit, on ? 0.35 : 0.9); }
+  for (const s of model.segs) if (s.valid) { strokeStep(s.step, s.length, segColor(s), 3, [], on ? 0.2 : 1); chevrons(s.step, segColor(s), on ? 0.2 : 1); }
+
+  if (on) {
+    let acc = 0;
+    for (const st of model.steps) {
+      if (acc >= anim.s) break;
+      const d = Math.min(st.len, anim.s - acc);
+      if (st.kind === 'transit') strokeStep(st, d, C.transit, 1.5, [5, 5], 1);
+      else strokeStep(st, d, segColor(st.seg), 3.5, [], 1);
+      acc += st.len;
+    }
+  }
+
+  // labels
+  if (showIds) {
+    ctx.font = '11px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const s of model.segs) {
+      if (!s.valid || s.length * view.k < 18) continue;
+      const p = s.at(s.length / 2), [x, y] = toS(p), n = p.th + Math.PI / 2;
+      const lx = x + Math.cos(n) * 14, ly = y - Math.sin(n) * 14, t = String(s.id), w = ctx.measureText(t).width + 8;
+      ctx.globalAlpha = 0.85; ctx.fillStyle = C.field; ctx.fillRect(lx - w / 2, ly - 8, w, 16); ctx.globalAlpha = 1;
+      ctx.fillStyle = s === sel ? C.ink : C.muted; ctx.fillText(t, lx, ly);
+    }
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
+  // start / end markers
+  const first = model.segs.find(s => s.valid), last = [...model.segs].reverse().find(s => s.valid);
+  if (first) {
+    const [x, y] = toS(first.start);
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fillStyle = C.field; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.ink; ctx.stroke();
+    ctx.font = '600 11px "Barlow", system-ui, sans-serif'; ctx.fillStyle = C.ink; ctx.fillText('START', x + 9, y + 14);
+  }
+  if (last) { const [x, y] = toS(last.end); ctx.fillStyle = C.ink; ctx.fillRect(x - 4.5, y - 4.5, 9, 9); }
+
+  if (on) drawRobot();
+}
+
+function drawRobot() {
+  const r = posAt(anim.s); if (!r) return;
+  const { st, p } = r, face = p.th + (st.rev ? Math.PI : 0), [x, y] = toS(p);
+  const col = st.kind === 'transit' ? C.ink : segColor(st.seg);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-face);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-11, -8, 20, 16, 4); else ctx.rect(-11, -8, 20, 16);
+  ctx.fillStyle = C.surface; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(2, -5); ctx.lineTo(8, 0); ctx.lineTo(2, 5); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  ctx.restore();
+}
+
+function fit() {
+  if (!model || !W) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of model.segs) if (s.valid) for (const p of s.pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+  if (!Number.isFinite(x0)) { x0 = y0 = -5; x1 = y1 = 5; }
+  const top = 66, bottom = 70, side = 40;
+  const w = Math.max(x1 - x0, 0.5), h = Math.max(y1 - y0, 0.5);
+  view.k = Math.max(0.5, Math.min((W - side * 2) / w, (H - top - bottom) / h));
+  view.cx = (x0 + x1) / 2;
+  const rc = (top + H - bottom) / 2;
+  view.cy = (y0 + y1) / 2 - (H / 2 - rc) / view.k;
+  draw();
+}
+
+function zoomAt(sx, sy, factor) {
+  const w = toW(sx, sy);
+  view.k = Math.max(0.2, Math.min(20000, view.k * factor));
+  view.cx = w.x - (sx - W / 2) / view.k;
+  view.cy = w.y + (sy - H / 2) / view.k;
+  draw();
+}
+
+/* ---------- hit testing ---------- */
+function hit(sx, sy) {
+  if (!model) return null;
+  let best = null, bd = 10;
+  for (const s of model.segs) {
+    if (!s.valid) continue;
+    const pts = s.pts.map(toS);
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, ay] = pts[i - 1], [bx, by] = pts[i], dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+      const t = L ? Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / L)) : 0;
+      const d = Math.hypot(sx - ax - t * dx, sy - ay - t * dy);
+      if (d < bd) { bd = d; best = s; }
+    }
+  }
+  return best;
+}
+
+/* ---------- panel ---------- */
+function kindText(s) {
+  if (s.kind === 'line') return 'Line';
+  if (s.kind === 'arc') return `Arc r ${f(s.radius, 2)} · ${s.sweep >= 0 ? '+' : '−'}${f(Math.abs(deg(s.sweep)), 1)}°`;
+  return 'Not drawn';
+}
+function joinPill(s) {
+  if (!s.valid) return '';
+  if (!s.join) return '<span class="pill">Path starts here</span>';
+  const j = s.join;
+  if (j.kind === 'smooth') return '<span class="pill smooth">Continues smoothly</span>';
+  if (j.kind === 'corner') return `<span class="pill corner">${f(Math.abs(deg(j.turn)), 1)}° corner</span>`;
+  return `<span class="pill">${f(j.gap, 2)} m transit${s.backwardTransit ? ', reversing' : ''}</span>`;
+}
+
+function renderPanel() {
+  const m = model;
+  const o = m.origin || {};
+  const lat = num(o.latitude), lon = num(o.longitude);
+  const metaBits = [
+    `<span>file <b>${esc(fileName)}</b></span>`,
+    `<span>job <b>${esc(m.job?.label ?? m.job?.id ?? '—')}</b></span>`,
+    lat !== null && lon !== null ? `<span>origin <b>${Math.abs(lat).toFixed(5)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lon).toFixed(5)}°${lon >= 0 ? 'E' : 'W'}</b></span>` : '',
+    m.heading !== undefined ? `<span>heading <b>${esc(f(num(m.heading) ?? NaN, 4))}</b></span>` : '',
+    m.utm ? `<span>UTM <b>${esc(m.utm.zone)}${m.utm.north === false ? 'S' : 'N'}</b></span>` : '',
+    m.groups > 1 ? `<span><b>${m.groups}</b> segment groups</span>` : ''
+  ];
+  $('#meta').innerHTML = metaBits.join('');
+
+  const fwd = m.segs.filter(s => s.valid && s.dir === 'fwd').length, bwd = m.segs.filter(s => s.valid && s.dir === 'bwd').length;
+  const invalid = m.segs.length - fwd - bwd;
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="k">Segments</div><div class="v">${m.segs.length} <small>${fwd} fwd · ${bwd} rev${invalid ? ` · ${invalid} not drawn` : ''}</small></div></div>
+    <div class="stat"><div class="k">Marked length</div><div class="v">${fm(m.marked)}</div></div>
+    <div class="stat"><div class="k">Transit length</div><div class="v">${fm(m.transit)}</div></div>
+    <div class="stat"><div class="k">Total drive</div><div class="v">${fm(m.total)}</div></div>`;
+
+  const wl = $('#warnings');
+  wl.hidden = !m.warnings.length;
+  wl.innerHTML = m.warnings.map(w => `<li><b>${esc(w.id)}</b>: ${esc(w.text)}</li>`).join('');
+
+  const list = $('#list');
+  list.innerHTML = '';
+  for (const s of m.segs) {
+    const li = document.createElement('li');
+    li.dataset.i = s.gi;
+    const chip = s.valid ? s.dir : 'bad';
+    const warn = s.notes.length ? `<span class="pill warn">${s.notes.length === 1 ? '1 note' : s.notes.length + ' notes'}</span>` : '';
+    li.innerHTML = `
+      <button class="seg-row" type="button" id="seg-${s.gi}">
+        <span class="chip ${chip}"></span>
+        <span class="seg-id">${esc(s.id)}</span>
+        <span class="seg-label">${esc(s.label)}</span>
+        <span class="seg-len">${s.valid ? fm(s.length) : ''}</span>
+        <span class="seg-sub"><span>${esc(kindText(s))} · ${s.dir === 'bwd' ? 'reverse' : 'forward'}</span>${joinPill(s)}${warn}</span>
+      </button>
+      <div class="detail" hidden></div>`;
+    li.querySelector('button').addEventListener('click', () => select(sel === s ? null : s, false));
+    s.li = li;
+    list.appendChild(li);
+  }
+}
+
+function detailHTML(s) {
+  const rows = [];
+  const row = (k, v) => rows.push(`<dt>${k}</dt><dd>${v}</dd>`);
+  row('Geometry', s.kind === 'line' ? 'line_segment' : s.kind === 'arc' ? 'circular_arc' : esc(s.kind));
+  row('Driving', s.dir === 'bwd' ? 'Reverse (LINEAR_DIRECTION_BACKWARD)' : 'Forward (LINEAR_DIRECTION_FORWARD)');
+  if (s.valid) {
+    row('Start', fp(s.start));
+    row('End', fp(s.end) + (s.kind === 'arc' ? ' <span style="color:var(--muted)">computed</span>' : ''));
+    if (s.kind === 'arc') {
+      row('Center', fp(s.center));
+      row('Radius', fm(s.radius));
+      row('Sweep', `${f(s.sweep, 6)} rad (${f(deg(s.sweep), 2)}°, ${s.sweep >= 0 ? 'counter-clockwise' : 'clockwise'})`);
+    }
+    row('Length', fm(s.length));
+    const j = s.join;
+    row('From previous', !j ? 'first segment' : j.kind === 'smooth' ? `joins ${esc(j.prev.id)} smoothly` :
+      j.kind === 'corner' ? `joins ${esc(j.prev.id)} at ${f(deg(j.turn), 1)}° turn` :
+      `${fm(j.gap)} transit from ${esc(j.prev.id)}${j.gap > 0 ? `, heading turn ${f(deg(j.turn), 1)}°` : ''}`);
+  }
+  row('backward_transit', s.raw.backward_transit === undefined ? 'not set' : esc(String(s.raw.backward_transit)));
+  row('Tool', s.tools.length ? s.tools.map(t => `tool ${esc(t.tool ?? '?')} from ${esc(f(num(t.arc_length) ?? 0, 3))} m`).join('<br>') : 'none');
+  row('Padding', `pre ${s.pre === undefined ? 'not set' : esc(f(num(s.pre) ?? NaN))} · post ${s.post === undefined ? 'not set' : esc(f(num(s.post) ?? NaN))}`);
+  const notes = s.notes.length ? `<ul>${s.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : '';
+  return `<dl>${rows.join('')}</dl>${notes}<details><summary>Raw JSON</summary><pre>${esc(JSON.stringify(s.raw, null, 2))}</pre></details>`;
+}
+
+function select(s, fromMap) {
+  if (sel && sel.li) { sel.li.classList.remove('sel'); const d = sel.li.querySelector('.detail'); d.hidden = true; d.innerHTML = ''; }
+  sel = s;
+  if (s && s.li) {
+    s.li.classList.add('sel');
+    const d = s.li.querySelector('.detail'); d.innerHTML = detailHTML(s); d.hidden = false;
+    if (fromMap) s.li.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  draw();
+}
+
+/* ---------- playback ---------- */
+function updatePlayUI() {
+  const t = model ? model.total : 0;
+  $('#play').textContent = anim.playing ? 'Pause' : 'Play';
+  $('#scrub').value = t ? Math.round(anim.s / t * 1000) : 0;
+  let label = '';
+  let cur = null;
+  if (anim.active && model) {
+    const r = posAt(anim.s);
+    if (r) {
+      cur = r.st.seg;
+      label = r.st.kind === 'transit' ? `transit → ${r.st.seg.id}${r.st.rev ? ' · reversing' : ''}` : `${r.st.seg.id} · ${r.st.rev ? 'reverse' : 'forward'}`;
+    }
+  }
+  $('#now').textContent = `${anim.s.toFixed(1)} / ${t.toFixed(1)} m${label ? ' · ' + label : ''}`;
+  if (anim.curSeg !== cur) {
+    if (anim.curSeg && anim.curSeg.li) anim.curSeg.li.classList.remove('current');
+    if (cur && cur.li) cur.li.classList.add('current');
+    anim.curSeg = cur;
+  }
+}
+function loop(t) {
+  if (!anim.playing) return;
+  const dt = Math.min(0.1, (t - anim.last) / 1000); anim.last = t;
+  anim.s = Math.min(model.total, anim.s + dt * anim.speed);
+  if (anim.s >= model.total) anim.playing = false;
+  updatePlayUI(); draw();
+  if (anim.playing) requestAnimationFrame(loop);
+}
+function play() {
+  if (!model || !model.total) return;
+  if (anim.playing) { anim.playing = false; updatePlayUI(); return; }
+  if (anim.s >= model.total) anim.s = 0;
+  anim.active = true; anim.playing = true; anim.last = performance.now();
+  updatePlayUI(); requestAnimationFrame(loop);
+}
+function resetAnim() { anim.active = false; anim.playing = false; anim.s = 0; updatePlayUI(); draw(); }
+
+/* ---------- loading ---------- */
+function jsonError(e, text) {
+  let where = '';
+  const m = /position (\d+)/.exec(e.message);
+  if (m) {
+    const p = +m[1], before = text.slice(0, p);
+    where = ` at line ${before.split('\n').length}, column ${p - before.lastIndexOf('\n')}`;
+  } else {
+    const m2 = /line (\d+) column (\d+)/.exec(e.message);
+    if (m2) where = ` at line ${m2[1]}, column ${m2[2]}`;
+  }
+  return `This isn't valid JSON${where}. Check for a missing comma, bracket or quote near that spot. (${e.message})`;
+}
+
+function loadText(text, name) {
+  let root;
+  try { root = JSON.parse(text); } catch (e) { return jsonError(e, text); }
+  let m;
+  try { m = parseJob(root); } catch (e) { return e.message; }
+  model = m; fileName = name || 'pasted JSON'; sel = null; hover = null;
+  anim.curSeg = null; anim.active = false; anim.playing = false; anim.s = 0;
+  renderPanel(); updatePlayUI(); fit();
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ text: text.length < 2e6 ? text : '', name: fileName })); } catch (_) {}
+  return null;
+}
+
+function openEditor(text, err) {
+  $('#json-input').value = text ?? (model ? JSON.stringify(model.root, null, 2) : '');
+  const e = $('#ed-error'); e.hidden = !err; e.textContent = err || '';
+  $('#editor').hidden = false;
+  $('#json-input').focus();
+}
+function closeEditor() { $('#editor').hidden = true; $('#edit-json').focus(); }
+
+function readFile(file) {
+  const r = new FileReader();
+  r.onload = () => { const err = loadText(String(r.result), file.name); if (err) openEditor(String(r.result), `${file.name}: ${err}`); };
+  r.onerror = () => openEditor('', `Couldn't read ${file.name}.`);
+  r.readAsText(file);
+}
+
+/* ---------- events ---------- */
+const pointers = new Map();
+let drag = null, pinch = null, moved = false;
+
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (pointers.size === 1) { moved = false; drag = { x: e.offsetX, y: e.offsetY, cx: view.cx, cy: view.cy }; cv.classList.add('dragging'); }
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, k0: view.k, w: toW(mid.x, mid.y) };
+    moved = true;
+  }
+});
+cv.addEventListener('pointermove', e => {
+  const w = toW(e.offsetX, e.offsetY);
+  $('#readout').textContent = `x ${f(w.x, 2)}  y ${f(w.y, 2)} m · grid ${f(gridStep, 2)} m`;
+  if (pointers.has(e.pointerId)) {
+    pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    if (pinch && pointers.size >= 2) {
+      const [a, b] = [...pointers.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      view.k = Math.max(0.2, Math.min(20000, pinch.k0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0));
+      view.cx = pinch.w.x - (mid.x - W / 2) / view.k;
+      view.cy = pinch.w.y + (mid.y - H / 2) / view.k;
+      draw(); return;
+    }
+    if (drag) {
+      const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
+      if (Math.hypot(dx, dy) > 3) moved = true;
+      if (moved) { view.cx = drag.cx - dx / view.k; view.cy = drag.cy + dy / view.k; $('#tip').hidden = true; draw(); }
+      return;
+    }
+  }
+  if (e.pointerType === 'mouse') {
+    const h = hit(e.offsetX, e.offsetY);
+    cv.classList.toggle('hovering', !!h);
+    const tip = $('#tip');
+    if (h) {
+      tip.innerHTML = `<b>${esc(h.id)}</b> ${esc(h.label)}<div>${esc(kindText(h))} · ${fm(h.length)} · ${h.dir === 'bwd' ? 'reverse' : 'forward'}</div>`;
+      tip.hidden = false;
+      const tx = Math.min(e.offsetX + 14, W - tip.offsetWidth - 8), ty = e.offsetY + 16 + tip.offsetHeight > H - 60 ? e.offsetY - tip.offsetHeight - 10 : e.offsetY + 16;
+      tip.style.left = Math.max(8, tx) + 'px'; tip.style.top = ty + 'px';
+    } else tip.hidden = true;
+    if (h !== hover) { hover = h; draw(); }
+  }
+});
+function endPointer(e) {
+  if (!pointers.has(e.pointerId)) return;
+  if (!moved && pointers.size === 1 && e.type === 'pointerup') { const h = hit(e.offsetX, e.offsetY); select(h, true); }
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (pointers.size === 1) { const p = [...pointers.values()][0]; drag = { x: p.x, y: p.y, cx: view.cx, cy: view.cy }; }
+  if (!pointers.size) { drag = null; cv.classList.remove('dragging'); }
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('pointerleave', () => { $('#tip').hidden = true; if (hover) { hover = null; draw(); } });
+cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015))); }, { passive: false });
+
+$('#zoom-in').onclick = () => zoomAt(W / 2, H / 2, 1.4);
+$('#zoom-out').onclick = () => zoomAt(W / 2, H / 2, 1 / 1.4);
+$('#fit').onclick = fit;
+$('#show-ids').onchange = e => { showIds = e.target.checked; draw(); };
+$('#play').onclick = play;
+$('#reset').onclick = resetAnim;
+$('#speed').onchange = e => { anim.speed = +e.target.value; };
+$('#scrub').oninput = e => {
+  if (!model) return;
+  anim.playing = false; anim.active = true;
+  anim.s = model.total * e.target.value / 1000;
+  updatePlayUI(); draw();
+};
+
+$('#open-file').onclick = () => $('#file').click();
+$('#file').onchange = e => { const file = e.target.files[0]; if (file) readFile(file); e.target.value = ''; };
+$('#edit-json').onclick = () => openEditor();
+$('#ed-close').onclick = closeEditor;
+$('#editor').addEventListener('click', e => { if (e.target.id === 'editor') closeEditor(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#editor').hidden) closeEditor(); });
+$('#ed-sample').onclick = () => { $('#json-input').value = JSON.stringify(SAMPLE, null, 2); $('#ed-error').hidden = true; };
+$('#ed-apply').onclick = () => {
+  const text = $('#json-input').value;
+  const isSample = text.trim() === JSON.stringify(SAMPLE, null, 2).trim();
+  const err = loadText(text, isSample ? SAMPLE_NAME : 'pasted JSON');
+  if (err) { const el = $('#ed-error'); el.textContent = err; el.hidden = false; } else closeEditor();
+};
+
+['dragenter', 'dragover'].forEach(t => stage.addEventListener(t, e => { e.preventDefault(); stage.classList.add('drop'); }));
+['dragleave', 'drop'].forEach(t => stage.addEventListener(t, () => stage.classList.remove('drop')));
+stage.addEventListener('drop', e => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) readFile(file); });
+
+new ResizeObserver(() => {
+  const r = cv.getBoundingClientRect();
+  DPR = window.devicePixelRatio || 1; W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  if (!fitted && model && W) { fitted = true; fit(); } else draw();
+}).observe(cv);
+
+const refreshTheme = () => { readColors(); draw(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refreshTheme);
+new MutationObserver(refreshTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+readColors();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+
+/* ---------- start ---------- */
+(function start() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (_) {}
+  if (saved && saved.text && !loadText(saved.text, saved.name)) return;
+  loadText(JSON.stringify(SAMPLE, null, 2), SAMPLE_NAME);
+})();
+</script>
+</body>
+</html>
